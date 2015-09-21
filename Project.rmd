@@ -1,0 +1,125 @@
+---
+title: "Practical Machine Learning - Project"
+output: html_document
+---
+
+
+### 00 - Dependencies
+In order to execute properly this markdown, you will need to install beforehand the following packages: 
+<ul>
+<li>RCurl</li>
+<li>caret</li>
+<li>doParallel</li>
+<li>randomForest</li>
+<li>kernlab</li>
+</ul>
+
+### Downloading the data
+
+```{r downloadChunk,cache=TRUE}
+library(RCurl)
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",destfile="training.csv",method="libcurl")
+
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",destfile="validating.csv",method="libcurl")
+
+```
+### Populating the datasets (training and test)
+
+```{r populateChunk}
+training<-read.csv(file="training.csv",header=TRUE,sep=",",na.strings = c("NA", "#DIV/0!", ""))
+validating<-read.csv(file="validating.csv",header=TRUE,sep=",",,na.strings = c("NA", "#DIV/0!", ""))
+
+```
+
+
+
+### Preprocessing
+Before building the model, we will need to clean the data
+```{r nearZeroVar}
+library(caret)
+
+dim(training)
+
+#Removing columns
+training<-subset(training, , -c(X,user_name,raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp))
+validating<-subset(validating, , -c(X,user_name,raw_timestamp_part_1,raw_timestamp_part_2,cvtd_timestamp))
+dim(training)
+
+#Checking if some predictors only have a single unique value 
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+validating<-validating[,-nzv]
+dim(training)
+
+#Checking if a column has a big number of NAs values
+#We force to have at least 90% of real data,otherwise the column will be dropped
+enough_data<-apply(!is.na(training),2,sum)>(nrow(training)*0.9)
+
+training<-training[,enough_data]
+validating<-validating[,enough_data]
+dim(training)
+
+```
+```{r function, echo=FALSE}
+getModel <- function(training){
+
+library(doParallel)
+library(randomForest)
+library(kernlab)
+
+cores <- detectCores()
+
+cl <- makePSOCKcluster(cores)
+registerDoParallel(cl)
+
+rf <- foreach(ntree=rep(250, cores), .combine=combine, 
+                   .packages="randomForest") %dopar% {
+  randomForest(classe ~ ., data = training, ntree = ntree)
+}
+
+stopCluster(cl)
+return(rf)
+}
+```
+
+### Random forest with cross-validation
+```{r randomforest ,cache=TRUE}
+folders<-10
+
+set.seed(3141592)
+folds <- createFolds(training$classe, k = folders, list=TRUE,returnTrain=TRUE)
+sapply(folds,length)
+
+folds2 <- createFolds(training$classe, k = folders, list=TRUE,returnTrain=FALSE)
+sapply(folds2,length)
+
+iter<-folders
+accuracy<-0
+
+for (i in 1:folders){
+
+  train<-training[folds[[i]],]
+  test<-training[folds2[[i]],]
+
+  my_model<-getModel(train)
+  prediction<-predict(my_model,test)
+  result<-table(prediction,test$classe)
+  accuracy<-accuracy+(result[1,1]+result[2,2]+result[3,3]+result[4,4]+result[5,5])/sum(result)
+ 
+}
+accuracy<-accuracy/iter
+print(paste('The out of sample error expected is : ', sprintf("%.4f",1-accuracy)))
+```
+
+### Prediction
+```{r prediction}
+prediction<-predict(my_model,validating)
+prediction
+```
+
+
+
+
+
+
+
