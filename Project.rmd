@@ -4,7 +4,7 @@ output: html_document
 ---
 
 
-### 00 - Dependencies
+### Dependencies
 In order to execute properly this markdown, you will need to install beforehand the following packages: 
 <ul>
 <li>RCurl</li>
@@ -12,30 +12,38 @@ In order to execute properly this markdown, you will need to install beforehand 
 <li>doParallel</li>
 <li>randomForest</li>
 <li>kernlab</li>
+<li>ggplot2</li>
 </ul>
 
 ### Downloading the data
 
-```{r downloadChunk,cache=TRUE}
+```{r downloadChunk,cache=TRUE,warning=FALSE}
 library(RCurl)
 download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",destfile="training.csv",method="libcurl")
 
 download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",destfile="validating.csv",method="libcurl")
 
 ```
-### Populating the datasets (training and test)
+### Populating the datasets (training and validating)
 
 ```{r populateChunk}
 training<-read.csv(file="training.csv",header=TRUE,sep=",",na.strings = c("NA", "#DIV/0!", ""))
 validating<-read.csv(file="validating.csv",header=TRUE,sep=",",,na.strings = c("NA", "#DIV/0!", ""))
 
 ```
-
-
-
+### Histogram of the training set
+<p>First of all we should look if the data in the training set is skewed </p>
+```{r hist, echo=FALSE,warning=FALSE}
+library(ggplot2)
+p<-ggplot(data=training, aes(training$classe))
+p<-p+labs(title="Histogram") +labs(x="Classe", y="Density") 
+p<-p+geom_histogram(fill="lightblue",aes(y=..count../sum(..count..)))
+p
+```
+<p> All the group are more or less balanced, we shouldn't need to do a special consideration because of this.</p>
 ### Preprocessing
 Before building the model, we will need to clean the data
-```{r nearZeroVar}
+```{r nearZeroVar,cache=TRUE}
 library(caret)
 
 dim(training)
@@ -111,11 +119,6 @@ accuracy<-accuracy/iter
 print(paste('The out of sample error expected is : ', sprintf("%.4f",1-accuracy)))
 ```
 
-### Prediction
-```{r prediction}
-prediction<-predict(my_model,validating)
-prediction
-```
 
 
 
